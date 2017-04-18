@@ -76,7 +76,11 @@ def fundComponents(comp_dict, img_map, p, eGroups):
 			changeMapComponents(img_map, comp_dict[i], biggerGroup)
 			del comp_dict[i]
 
-
+'''
+*******************
+*******************
+MAKE IT RUN FASTER (UNION SET LIKE)
+'''
 def mapUnion(img):
 	component_dict = {}
 	img_map = -1*np.ones(img.shape, np.int)
@@ -113,10 +117,12 @@ def randColorVect(sz):
 
 
 IMAGE_TH = 220
-img = cv2.imread('BoletoBancario.png', 0)
+img = cv2.imread('CCF10042017.jpg', 0)
 _, img = cv2.threshold(img, IMAGE_TH, 255, cv2.THRESH_BINARY)
 p = [0,0]
-
+cv2.imshow('binarized',img)
+cv2.waitKey(0)
+print('wait... parsing')
 img_dict, img_map = mapUnion(img)
 
 #img_test = np.zeros((10,10), np.uint8)
@@ -144,7 +150,7 @@ for i in range(0,img_test.shape[0]):
 cv2.imshow('img_test', colord_img)
 cv2.waitKey(0)
 '''
-
+print('coloring...')
 colord_img = np.zeros([img.shape[0], img.shape[1], 3], np.uint8)
 colors = randColorVect(np.max(img_map)+2)
 for i in range(0,img.shape[0]):
