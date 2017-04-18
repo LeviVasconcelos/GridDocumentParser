@@ -58,9 +58,27 @@ def createComponent(label, point, outter):
 	c.outter = outter
 	return c
 
+
+def changeMapComponents(img_map, comp, newComp):
+	for i in comp.points:
+		img_map[tuple(i)] = newcomp
+
+def fundComponents(comp_dict, img_map, p, eGroups):
+	aux = [ len(com_dict[i].points) for i in eGroups ]
+	biggerGroupIdx = aux.index(max(aux))
+	biggerGroup = eGroups[biggerGroupIdx]
+	comp_dict[biggerGroup] += sum(comp_dict[i].points for i in eGroups if i != biggerGroup,[])
+
+	for i in eGroups:
+		if i != biggerGroup:
+			changeMapComponents(img_map, comp_dict[i], biggerGroup)
+			del comp_dict[i]
+
+
 def mapUnion(img):
 	component_dict = {}
 	img_map = -1*np.ones(img.shape, np.int)
+	new_group_idx = 0
 	for i in range(0,img.shape[0]):
 		for j in range(0, img.shape[1]):
 			eligibleGroups = []
@@ -72,7 +90,8 @@ def mapUnion(img):
 
 
 			if (len(eligibleGroups) == 0):
-				img_map[(i,j)] = len(component_dict)
+				img_map[(i,j)] = new_group_idx
+				new_group_idx += 1
 				newComp = createComponent(img_map[(i,j)], (i,j), outter )
 				component_dict[img_map[(i,j)]] = newComp
 
