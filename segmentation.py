@@ -67,6 +67,7 @@ def fundComponents(comp_dict, img_map, p, eGroups):
 	aux = [ len(comp_dict[i].points) for i in eGroups ]
 	biggerGroupIdx = aux.index(max(aux))
 	biggerGroup = eGroups[biggerGroupIdx]
+
 	img_map[p] = biggerGroup
 	comp_dict[biggerGroup].points += [p]
 	comp_dict[biggerGroup].points += sum([comp_dict[i].points for i in eGroups if i != biggerGroup],[])
@@ -76,6 +77,55 @@ def fundComponents(comp_dict, img_map, p, eGroups):
 			changeMapComponents(img_map, comp_dict[i], biggerGroup)
 			del comp_dict[i]
 
+
+def union(c1, c2, img_map, component_dict):
+	root1 = getParent(c1, img_map)
+	root2 = getParent(c2, img_map)
+	if (root1 == root2):
+		return
+	img_map[c2] = root1
+	component_dict[root1] += component_dict[root2]
+	del component_dict[root2]
+
+
+
+def unionComponents(groups, p, img_map, component_dict):
+	g = groups[0]
+	groups = groups[1:] if len(groups) > 0 else []
+	img_map[p] = getParent(g, img_map)
+	component_dict[getParent(g,img_map)] += [p]
+	for g in groups:
+		if g != p:
+			union(p, g, img_map, component_dict)
+
+
+
+def getParent(p, img_map):
+	while (tuple(img_map[p]) != p):
+		p = tuple(img_map[p])
+	return p
+
+
+def mapUnion_uSet(img):
+	component_dict = {}
+	img_map = np.zeros([] + img.shape + 2, np.int)
+	for i in range(img.shape[0]):
+		for j in range(img.shape[1]):
+			eligibleGroups = [];
+
+			for p in getMapNeighbours((i,j), img.shape):
+				if (img[p] == img[(i,j)] and getParent(p, img_map) bot in eligibleGroups):
+					eligibleGroups += [getParent(p, img_map)]
+
+			if(len(eligibleGroups) == 0): #if there is no alike group
+				img_map[(i,j)] = (i,j)
+				component_dict[(i,j)] = [(i,j)]
+			else:
+				unionComponents(eligibleGroups, (i,j), img_map, component_dict)
+
+
+
+
 '''
 *******************
 *******************
@@ -83,24 +133,27 @@ MAKE IT RUN FASTER (UNION SET LIKE)
 '''
 def mapUnion(img):
 	component_dict = {}
-	img_map = -1*np.ones(img.shape, np.int)
+	img_map = -1*np.ones([] + img.shape + 3, np.int)
+	for i in range(0, img_map.shape[0]):
+		for j in range(0, img_map.shape[1]):
+			img_map = [i, j, 0];
 	new_group_idx = 0
 	for i in range(0,img.shape[0]):
 		for j in range(0, img.shape[1]):
-			#raw_input('teste')
-			#print(img_map)
 			eligibleGroups = []
 			outter = None
 
 			for p in getMapNeighbours((i,j), img.shape):
-				if (img[p] == img[(i,j)] and img_map[p] not in eligibleGroups):
-					eligibleGroups += [img_map[p]]
+				if (img[p] == img[(i,j)] and img_map[p][2] not in eligibleGroups):
+					eligibleGroups += [img_map[p][2]]
 
 			if (len(eligibleGroups) == 0):
-				img_map[(i,j)] = new_group_idx
+				img_map[(i,j)][2] = new_group_idx
+				img_map[(i,j)][0] = i
+				img_map[(i,j)][1] = j
 				new_group_idx += 1
-				newComp = createComponent(img_map[(i,j)], (i,j), outter )
-				component_dict[img_map[(i,j)]] = newComp
+				newComp = createComponent(img_map[(i,j)], (i,j), outter)
+				component_dict[img_map[(i,j)][2]] = newComp
 			else:
 				fundComponents(component_dict, img_map, (i,j), eligibleGroups)
 
@@ -117,7 +170,7 @@ def randColorVect(sz):
 
 
 IMAGE_TH = 220
-img = cv2.imread('CCF10042017.jpg', 0)
+img = cv2.imread('BoletoBancario.png', 0)
 _, img = cv2.threshold(img, IMAGE_TH, 255, cv2.THRESH_BINARY)
 p = [0,0]
 cv2.imshow('binarized',img)
