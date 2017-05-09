@@ -10,17 +10,15 @@ def getNeighbours(p, bounds):
 	indexes = [ np.array((0,-1)), np.array((1,-1)), 
 				np.array((1,0)), np.array((1, 1)), 
 				np.array((0,1)), np.array((-1, 1)),
-				np.array((-1,0)), np.array((-1,-1))] #Vizinhos de um pixel
+				np.array((-1,0)), np.array((-1,-1))] #pixel neighbours
 	x = [ tuple(p+i) for i in indexes if withinBounds(p+i, bounds)]
 	return x
 
-def getMapNeighbours(p, bounds):
-	indexes = [ np.array((0, -1)), np.array((-1,-1)),
-							np.array((-1,0)), np.array((-1, 1)) ]
-	x = [tuple(p+i) for i in indexes if withinBounds(p+i, bounds)]
-	return x
 
-
+'''
+Just conceptual implementation, not currently being used because of its performance.
+MapUnion is faster.
+'''
 def floodFill(img, p, k):
 	mask = np.zeros(img.shape, np.int)
 	border = []
@@ -44,24 +42,38 @@ def floodFill(img, p, k):
 	return [component,border,[min_cords,max_cords]]
 
 
-class Component:
-	def __init__(self):
-		self.points = []
-		self.label = None
-		self.outter = None
-		self.rect = []
+#
+#-----------------------------------------------------------------------------------------
+#Union-set algorithm implementation, modified to fit our needs, but the idea is the same.
+#-----------------------------------------------------------------------------------------
+#
 
-def createComponent(label, point, outter):
-	c = Component()
-	c.label = label
-	c.points += [point]
-	c.outter = outter
-	return c
+def getParent(p, img_map):
+	while (tuple(img_map[p]) != p):
+		p = tuple(img_map[p])
+	return p
 
 
-def changeMapComponents(img_map, comp, newComp):
-	for i in comp.points:
-		img_map[i] = newComp
+def union(c1, c2, img_map, component_dict):
+	root1 = getParent(c1, img_map)
+	root2 = getParent(c2, img_map)
+	if (root1 == root2):
+		return
+	img_map[c2] = root1
+	component_dict[root1] += component_dict[root2]
+	del component_dict[root2]
+
+
+def unionComponents(groups, p, img_map, component_dict):
+	g = groups[0]
+	groups = groups[1:] if len(groups) > 0 else []
+	img_map[p] = getParent(g, img_map)
+	component_dict[getParent(g,img_map)] += [p]
+	for g in groups:
+		if g != p:
+			union(p, g, img_map, component_dict)
+
+
 
 def fundComponents(comp_dict, img_map, p, eGroups):
 	aux = [ len(comp_dict[i].points) for i in eGroups ]
@@ -78,87 +90,37 @@ def fundComponents(comp_dict, img_map, p, eGroups):
 			del comp_dict[i]
 
 
-def union(c1, c2, img_map, component_dict):
-	root1 = getParent(c1, img_map)
-	root2 = getParent(c2, img_map)
-	if (root1 == root2):
-		return
-	img_map[c2] = root1
-	component_dict[root1] += component_dict[root2]
-	del component_dict[root2]
+#Computes a pixel's neighbourhood (left and upper pixel)
+def getMapNeighbours(p, bounds):
+	indexes = [ np.array((0, -1)), np.array((-1,-1)),
+							np.array((-1,0)), np.array((-1, 1)) ]
+	x = [tuple(p+i) for i in indexes if withinBounds(p+i, bounds)]
+	return x
 
 
 
-def unionComponents(groups, p, img_map, component_dict):
-	g = groups[0]
-	groups = groups[1:] if len(groups) > 0 else []
-	img_map[p] = getParent(g, img_map)
-	component_dict[getParent(g,img_map)] += [p]
-	for g in groups:
-		if g != p:
-			union(p, g, img_map, component_dict)
-
-
-
-def getParent(p, img_map):
-	while (tuple(img_map[p]) != p):
-		p = tuple(img_map[p])
-	return p
-
-
-def mapUnion_uSet(img):
+def mapUnion(img):
 	component_dict = {}
-	img_map = np.zeros([] + img.shape + 2, np.int)
-	for i in range(img.shape[0]):
+	img_map = np.zeros((img.shape[0], img.shape[1], 2), np.int)
+
+	for i in range(img.shape[0]): # Visits every pixel
 		for j in range(img.shape[1]):
 			eligibleGroups = [];
 
 			for p in getMapNeighbours((i,j), img.shape):
-				if (img[p] == img[(i,j)] and getParent(p, img_map) bot in eligibleGroups):
+				#If pixels in the considered neighbourhood (left and up) of (i,j) has the same color
+				#store on eligibleGroups to be grouped later.
+				if (img[p] == img[(i,j)] and getParent(p, img_map) not in eligibleGroups):
 					eligibleGroups += [getParent(p, img_map)]
 
-			if(len(eligibleGroups) == 0): #if there is no alike group
+			if(len(eligibleGroups) == 0): #if there is no alike group, create a new component for this pixel alone.
 				img_map[(i,j)] = (i,j)
 				component_dict[(i,j)] = [(i,j)]
 			else:
+				#Group eligibleGroups adding (i,j) to the new component.
 				unionComponents(eligibleGroups, (i,j), img_map, component_dict)
-
-
-
-
-'''
-*******************
-*******************
-MAKE IT RUN FASTER (UNION SET LIKE)
-'''
-def mapUnion(img):
-	component_dict = {}
-	img_map = -1*np.ones([] + img.shape + 3, np.int)
-	for i in range(0, img_map.shape[0]):
-		for j in range(0, img_map.shape[1]):
-			img_map = [i, j, 0];
-	new_group_idx = 0
-	for i in range(0,img.shape[0]):
-		for j in range(0, img.shape[1]):
-			eligibleGroups = []
-			outter = None
-
-			for p in getMapNeighbours((i,j), img.shape):
-				if (img[p] == img[(i,j)] and img_map[p][2] not in eligibleGroups):
-					eligibleGroups += [img_map[p][2]]
-
-			if (len(eligibleGroups) == 0):
-				img_map[(i,j)][2] = new_group_idx
-				img_map[(i,j)][0] = i
-				img_map[(i,j)][1] = j
-				new_group_idx += 1
-				newComp = createComponent(img_map[(i,j)], (i,j), outter)
-				component_dict[img_map[(i,j)][2]] = newComp
-			else:
-				fundComponents(component_dict, img_map, (i,j), eligibleGroups)
-
-
 	return component_dict, img_map
+
 
 
 
@@ -171,46 +133,28 @@ def randColorVect(sz):
 
 IMAGE_TH = 220
 img = cv2.imread('BoletoBancario.png', 0)
+
+#We should use this algorithm in a binarized image.
 _, img = cv2.threshold(img, IMAGE_TH, 255, cv2.THRESH_BINARY)
+
+#initial pixel.
 p = [0,0]
 cv2.imshow('binarized',img)
 cv2.waitKey(0)
+
 print('wait... parsing')
 img_dict, img_map = mapUnion(img)
-
-#img_test = np.zeros((10,10), np.uint8)
-#img_test[0:5,5] = 255
-#img_test[0:180,70] = 255
-#img_test[0:90,40:42] = 255
-#img_test[0:30,20:22] = 255
-#img_test[45,0:100] = 255
-
-#img_dict, img_map = mapUnion(img_test)
-#print('max:',np.max(img_map))
-#print('min:',np.min(img_map))
-#print(img_map[40:45,40:45])
-#print(img_test[40:45,40:45])
-#print(len(img_dict))
-#print(img_map[0:5,0:5])
-'''
-colord_img = np.zeros([img_test.shape[0], img_test.shape[1], 3], np.uint8)
-colors = randColorVect(np.max(img_map)+2)
-for i in range(0,img_test.shape[0]):
-	for j in range(0,img_test.shape[1]):
-		colord_img[(i,j)] = colors[ img_map[(i,j)] ]
+print('Found: ', len(img_dict), ' groups')
 
 
-cv2.imshow('img_test', colord_img)
-cv2.waitKey(0)
-'''
 print('coloring...')
 colord_img = np.zeros([img.shape[0], img.shape[1], 3], np.uint8)
-colors = randColorVect(np.max(img_map)+2)
+colors = randColorVect(len(img_dict))
+dict_enum = img_dict.keys()
 for i in range(0,img.shape[0]):
 	for j in range(0,img.shape[1]):
-		colord_img[(i,j)] = colors[ img_map[(i,j)] ]
+		p = getParent((i,j), img_map)
+		colord_img[(i,j)] = colors[ dict_enum.index(p) ]
 
 cv2.imshow('teste', colord_img)
-cv2.waitKey(0);
-cv2.imshow('binarized', img)
 cv2.waitKey(0);
